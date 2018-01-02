@@ -155,7 +155,7 @@ func (v2 *signer) createQueryString() string {
 	sort.Strings(queryKeys)
 
 	// build URL-encoded query keys and values
-	queryKeysAndValues := make([]string, len(queryKeys))
+	var queryKeysAndValues []string
 	for _, key := range subresources {
 		if _, ok := v2.Query[key]; ok {
 			k := strings.Replace(url.QueryEscape(key), "+", "%20", -1)
