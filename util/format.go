@@ -3,8 +3,8 @@ package util
 import (
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
+	"strings"
 )
 
 func FormatTime(t *time.Time) string {
@@ -27,15 +27,15 @@ func normalizeTimeValue(v int) string {
 func ParseAndValidateBucketURL(bucket string) (*url.URL, error) {
 	url, err := url.Parse(bucket)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse provided bucket correct format s3://[BUCKET][/PREFIX]")
+		return nil, fmt.Errorf("unable to parse provided bucket - correct format s3://[BUCKET][/PREFIX]")
 	}
 
 	if strings.ToLower(url.Scheme) != "s3" {
-		return nil, fmt.Errorf("unsupported schema provided [%s] only s3 schema supported", url.Scheme)
+		return nil, fmt.Errorf("unsupported schema provided - correct format s3://[[BUCKET][/PREFIX]")
 	}
 
 	if len(url.Host) == 0 {
-		return nil, fmt.Errorf("please provide a bucket name s3://[BUCKET][/PREFIX]")
+		return nil, fmt.Errorf("missing bucket name - correct format s3://[BUCKET][/PREFIX]")
 	}
 
 	return url, nil
