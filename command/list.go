@@ -22,7 +22,7 @@ func List(s3Service service.S3Service) cli.Command {
 			if len(args) == 0 {
 				buckets, err := s3Service.ListBuckets()
 				if err != nil {
-					return err
+					return cli.NewExitError(err, 1)
 				}
 
 				for _, bucket := range buckets {
@@ -32,12 +32,12 @@ func List(s3Service service.S3Service) cli.Command {
 				return nil
 			}
 
-			response, listErr := s3Service.ListObjects(args.Get(0))
+			objects, listErr := s3Service.ListObjects(args.Get(0))
 			if listErr != nil {
-				return listErr
+				return cli.NewExitError(listErr, 1)
 			}
 
-			util.Print(response)
+			util.Print(objects)
 			return nil
 		},
 	}
