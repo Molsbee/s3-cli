@@ -15,7 +15,7 @@ import (
 
 type S3Service interface {
 	ListBuckets() ([]model.Bucket, error)
-	ListObjects(bucket string) (model.ObjectResponse, error)
+	ListObjects(bucket string) (*model.ObjectResponse, error)
 }
 
 type s3Service struct {
@@ -39,76 +39,62 @@ func NewS3Service(conf config.S3ServiceConfig) S3Service {
 	return &s3Service{s3Serv}
 }
 
-func (s *s3Service) ListBuckets() (buckets []model.Bucket, err error) {
-	response, bErr := s.s3.ListBuckets(nil)
-	if bErr != nil {
-		err = fmt.Errorf("failed to retrieve bucket information - Error: %s", err.Error())
-		return
+func (s *s3Service) ListBuckets() ([]model.Bucket, error) {
+	response, err := s.s3.ListBuckets(nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve bucket information - Error: %s", err.Error())
 	}
 
+	var buckets []model.Bucket
 	for _, bucket := range response.Buckets {
 		buckets = append(buckets, model.NewBucket(bucket))
 	}
-	return
+	return buckets, nil
 }
 
-func (s *s3Service) ListObjects(bucket string) (objectResponse model.ObjectResponse, err error) {
+func (s *s3Service) ListObjects(bucket string) (*model.ObjectResponse, error) {
 	url, err := util.ParseAndValidateBucketURL(bucket)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	request := &s3.ListObjectsInput{
 		Bucket: aws.String(url.Host),
+		Delimiter: aws.String("/"),
 	}
 
-	if len(url.Path) == 0 {
-		request.Delimiter = aws.String("/")
+	prefix := strings.TrimPrefix(url.Path, "/")
+	finalSlash := strings.LastIndex(prefix, "/") + 1
+	if finalSlash != len(prefix) {
+		prefix += "/"
+	}
+
+	if len(prefix) != 0 {
+		request.Prefix = aws.String(prefix)
 	}
 
 	response, listErr := s.s3.ListObjects(request)
 	if listErr != nil {
-		err = fmt.Errorf("failed to retrieve objects - Error: %s", err.Error())
-		return
+		return nil, fmt.Errorf("failed to retrieve objects - Error: %s", listErr.Error())
 	}
 
-	folder := strings.TrimPrefix(url.Path, "/")
-	objectResponse = convertToObjectResponse(response, folder)
-	return
+	return convertToObjectResponse(response, prefix), nil
 }
 
-func convertToObjectResponse(output *s3.ListObjectsOutput, folderFilter string) model.ObjectResponse {
+func convertToObjectResponse(output *s3.ListObjectsOutput, folderFilter string) *model.ObjectResponse {
 	var prefixes []model.Prefix
 	for _, prefix := range output.CommonPrefixes {
-		prefixes = append(prefixes, model.Prefix{Name: *prefix.Prefix})
-	}
-
-	folderFilterLength := len(folderFilter)
-	if folderFilterLength != 0 {
-		finalSlash := strings.LastIndex(folderFilter, "/") + 1
-		if finalSlash != folderFilterLength {
-			folderFilter += "/"
-		}
+		directoryName := strings.TrimPrefix(*prefix.Prefix, folderFilter)
+		prefixes = append(prefixes, model.Prefix{Name: directoryName})
 	}
 
 	var objects []model.Object
 	for _, object := range output.Contents {
-		if len(folderFilter) == 0 {
-			objects = append(objects, model.NewObjectFromS3Object(object))
-		} else {
-			if strings.HasPrefix(*object.Key, folderFilter) {
-				key := strings.TrimPrefix(*object.Key, folderFilter)
-				if strings.Contains(key, "/") {
-					fmt.Println("Directory")
-				}
-
-
-				objects = append(objects, model.NewObject(object.LastModified, *object.Size, key))
-			}
-		}
+		fileName := strings.TrimPrefix(*object.Key, folderFilter)
+		objects = append(objects, model.NewObject(object.LastModified, *object.Size, fileName))
 	}
 
-	return model.ObjectResponse{
+	return &model.ObjectResponse{
 		Prefixes: prefixes,
 		Objects:  objects,
 	}
